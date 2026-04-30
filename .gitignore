@@ -46,3 +46,4 @@ upload/
 worklog.md
 db/
 .zscripts/
+.env*.local

@@ -4,9 +4,12 @@ import { useNovelStore } from '@/store/novelStore';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
+  SelectSeparator,
 } from '@/components/ui/select';
 import {
   Popover,
@@ -15,17 +18,8 @@ import {
 } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
 import { Cpu, Settings2 } from 'lucide-react';
-import { useEffect } from 'react';
-
-const MODEL_NAMES: Record<string, string> = {
-  'nvidia/llama-3.3-nemotron-super-49b-v1.5': 'Nemotron Super 49B',
-  'nvidia/llama-3.1-nemotron-70b-instruct': 'Nemotron 70B',
-  'nvidia/llama-3.1-nemotron-ultra-253b-v1': 'Nemotron Ultra 253B',
-  'nvidia/nemotron-4-340b-instruct': 'Nemotron 4 340B',
-  'nvidia/llama-3.2-nemotron-ultra-2-104b-v1': 'Nemotron Ultra 104B',
-  'nvidia/llama3-70b-instruct': 'Llama3 70B',
-  'nvidia/llama3-8b-instruct': 'Llama3 8B',
-};
+import { useEffect, useMemo } from 'react';
+import { AVAILABLE_MODELS } from '@/lib/nvidia';
 
 const MAX_TOKEN_OPTIONS = [
   { value: 2048, label: '2K' },
@@ -35,20 +29,32 @@ const MAX_TOKEN_OPTIONS = [
   { value: 16384, label: '16K' },
 ];
 
+// Group and sort models for display
+function getGroupedModels(models: typeof AVAILABLE_MODELS) {
+  const groups = new Map<string, typeof AVAILABLE_MODELS>();
+  for (const model of models) {
+    const g = model.group || '其他';
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g)!.push(model);
+  }
+  return groups;
+}
+
 export default function ModelConfig() {
   const {
-    models, selectedModel, loadModels, setSelectedModel,
+    selectedModel, loadModels, setSelectedModel,
     temperature, maxTokens, topP,
     setTemperature, setMaxTokens, setTopP,
   } = useNovelStore();
 
+  // Initialize models from AVAILABLE_MODELS (client-side)
   useEffect(() => {
-    if (models.length === 0) {
-      loadModels();
-    }
-  }, [loadModels, models.length]);
+    loadModels();
+  }, [loadModels]);
 
-  const displayName = (modelId: string) => MODEL_NAMES[modelId] || modelId.split('/').pop() || modelId;
+  const groupedModels = useMemo(() => getGroupedModels(AVAILABLE_MODELS), []);
+
+  const currentModel = AVAILABLE_MODELS.find(m => m.id === selectedModel);
 
   return (
     <div className="flex items-center gap-2">
@@ -57,11 +63,26 @@ export default function ModelConfig() {
         <SelectTrigger className="w-52 h-8 text-xs bg-transparent border-border">
           <SelectValue placeholder="选择AI模型" />
         </SelectTrigger>
-        <SelectContent className="bg-card border-border">
-          {models.map((modelId) => (
-            <SelectItem key={modelId} value={modelId} className="text-xs">
-              {displayName(modelId)}
-            </SelectItem>
+        <SelectContent className="bg-card border-border max-h-80">
+          {Array.from(groupedModels.entries()).map(([group, models], idx) => (
+            <div key={group}>
+              {idx > 0 && <SelectSeparator />}
+              <SelectGroup>
+                <SelectLabel className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  {group}
+                </SelectLabel>
+                {models.map((model) => (
+                  <SelectItem key={model.id} value={model.id} className="text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate max-w-[160px]">{model.name}</span>
+                      <span className="text-[9px] text-muted-foreground/60 shrink-0">
+                        {model.id.split('/').pop()}
+                      </span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </div>
           ))}
         </SelectContent>
       </Select>
@@ -78,6 +99,14 @@ export default function ModelConfig() {
               <Settings2 className="w-4 h-4 text-muted-foreground" />
               <h4 className="text-sm font-medium">AI参数设置</h4>
             </div>
+
+            {/* Current model info */}
+            {currentModel && (
+              <div className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-2">
+                当前模型：<span className="font-medium text-foreground">{currentModel.name}</span>
+                <span className="text-muted-foreground/60 ml-1">({currentModel.group})</span>
+              </div>
+            )}
 
             {/* Temperature */}
             <div className="space-y-2">

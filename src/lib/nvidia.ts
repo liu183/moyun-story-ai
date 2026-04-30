@@ -3,35 +3,112 @@ const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || '';
 
 const FALLBACK_MODELS = [
   'nvidia/llama-3.3-nemotron-super-49b-v1.5',
-  'nvidia/llama-3.1-nemotron-70b-instruct',
-  'nvidia/llama-3.1-nemotron-ultra-253b-v1',
-  'nvidia/nemotron-4-340b-instruct',
-  'nvidia/llama-3.2-nemotron-ultra-2-104b-v1',
-  'nvidia/llama3-70b-instruct',
-  'nvidia/llama3-8b-instruct',
+  'deepseek-ai/deepseek-r1',
+  'deepseek-ai/deepseek-v4-pro',
+  'qwen/qwen3-235b-a22b',
+  'mistralai/mistral-large-3-675b-instruct-2512',
+  'meta/llama-3.1-405b-instruct',
+  'google/gemma-3-27b-it',
 ];
 
 let currentModelIndex = 0;
 
+// All available models on NVIDIA NIM platform, grouped by provider
 export const AVAILABLE_MODELS = [
-  { id: 'nvidia/llama-3.3-nemotron-super-49b-v1.5', name: 'Llama 3.3 Nemotron Super 49B' },
-  { id: 'nvidia/llama-3.1-nemotron-70b-instruct', name: 'Llama 3.1 Nemotron 70B' },
-  { id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1', name: 'Llama 3.1 Nemotron Ultra 253B' },
-  { id: 'nvidia/nemotron-4-340b-instruct', name: 'Nemotron 4 340B' },
-  { id: 'nvidia/llama-3.2-nemotron-ultra-2-104b-v1', name: 'Llama 3.2 Nemotron Ultra 104B' },
-  { id: 'nvidia/llama3-70b-instruct', name: 'Llama3 70B' },
-  { id: 'nvidia/llama3-8b-instruct', name: 'Llama3 8B' },
+  // NVIDIA - Nemotron series (recommended for Chinese content)
+  { id: 'nvidia/llama-3.3-nemotron-super-49b-v1.5', name: 'Nemotron Super 49B', group: 'NVIDIA' },
+  { id: 'nvidia/llama-3.1-nemotron-70b-instruct', name: 'Nemotron 70B', group: 'NVIDIA' },
+  { id: 'nvidia/llama-3.1-nemotron-ultra-253b-v1', name: 'Nemotron Ultra 253B', group: 'NVIDIA' },
+  { id: 'nvidia/llama-3.2-nemotron-ultra-2-104b-v1', name: 'Nemotron Ultra 104B v2', group: 'NVIDIA' },
+  { id: 'nvidia/nemotron-4-340b-instruct', name: 'Nemotron 4 340B', group: 'NVIDIA' },
+  // DeepSeek
+  { id: 'deepseek-ai/deepseek-r1', name: 'DeepSeek R1', group: 'DeepSeek' },
+  { id: 'deepseek-ai/deepseek-v4-pro', name: 'DeepSeek V4 Pro', group: 'DeepSeek' },
+  { id: 'deepseek-ai/deepseek-v3.2-0324', name: 'DeepSeek V3.2', group: 'DeepSeek' },
+  { id: 'deepseek-ai/deepseek-coder-6.7b-instruct', name: 'DeepSeek Coder 6.7B', group: 'DeepSeek' },
+  // Qwen
+  { id: 'qwen/qwen3-235b-a22b', name: 'Qwen3 235B', group: 'Qwen' },
+  { id: 'qwen/qwen3-32b', name: 'Qwen3 32B', group: 'Qwen' },
+  { id: 'qwen/qwen2.5-coder-32b-instruct', name: 'Qwen2.5 Coder 32B', group: 'Qwen' },
+  { id: 'qwen/qwen3-coder-480b-a35b-instruct', name: 'Qwen3 Coder 480B', group: 'Qwen' },
+  // Mistral
+  { id: 'mistralai/mistral-large-3-675b-instruct-2512', name: 'Mistral Large 675B', group: 'Mistral' },
+  { id: 'mistralai/mixtral-8x22b-instruct-v0.1', name: 'Mixtral 8x22B', group: 'Mistral' },
+  { id: 'mistralai/devstral-2-123b-instruct-2512', name: 'Devstral 123B', group: 'Mistral' },
+  { id: 'mistralai/magistral-3b-2506', name: 'Magistral 3B', group: 'Mistral' },
+  // Meta Llama
+  { id: 'meta/llama-3.1-405b-instruct', name: 'Llama 3.1 405B', group: 'Meta' },
+  { id: 'meta/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', group: 'Meta' },
+  { id: 'meta/llama-3.1-8b-instruct', name: 'Llama 3.1 8B', group: 'Meta' },
+  { id: 'meta/llama-4-maverick-17b-128e-instruct', name: 'Llama 4 Maverick 17B', group: 'Meta' },
+  { id: 'meta/llama4-scout-17b-16e-instruct', name: 'Llama 4 Scout 17B', group: 'Meta' },
+  // Google
+  { id: 'google/gemma-3-27b-it', name: 'Gemma 3 27B', group: 'Google' },
+  { id: 'google/gemma-3-12b-it', name: 'Gemma 3 12B', group: 'Google' },
+  { id: 'google/gemma-3-4b-it', name: 'Gemma 3 4B', group: 'Google' },
+  { id: 'google/codegemma-7b-it', name: 'CodeGemma 7B', group: 'Google' },
+  // Microsoft
+  { id: 'microsoft/phi-4', name: 'Phi-4', group: 'Microsoft' },
+  { id: 'microsoft/phi-4-mini-instruct', name: 'Phi-4 Mini', group: 'Microsoft' },
+  { id: 'microsoft/phi-4-multimodal-instruct', name: 'Phi-4 Multimodal', group: 'Microsoft' },
+  { id: 'microsoft/phi-3.5-moe-instruct', name: 'Phi-3.5 MoE', group: 'Microsoft' },
+  // Moonshot AI
+  { id: 'moonshotai/kimi-k2-instruct', name: 'Kimi K2', group: 'Moonshot' },
+  // MiniMax
+  { id: 'minimax/minimax-m1-80k', name: 'MiniMax M1 80K', group: 'MiniMax' },
+  // GLM
+  { id: 'z-ai/glm-4.5', name: 'GLM 4.5', group: 'GLM' },
+  { id: 'z-ai/glm-4.7', name: 'GLM 4.7', group: 'GLM' },
+  { id: 'z-ai/glm-5', name: 'GLM 5', group: 'GLM' },
 ];
 
 // Context window sizes for each model (in tokens, approximate)
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  // NVIDIA
   'nvidia/llama-3.3-nemotron-super-49b-v1.5': 131072,
   'nvidia/llama-3.1-nemotron-70b-instruct': 131072,
   'nvidia/llama-3.1-nemotron-ultra-253b-v1': 131072,
-  'nvidia/nemotron-4-340b-instruct': 4096,
   'nvidia/llama-3.2-nemotron-ultra-2-104b-v1': 131072,
-  'nvidia/llama3-70b-instruct': 8192,
-  'nvidia/llama3-8b-instruct': 8192,
+  'nvidia/nemotron-4-340b-instruct': 4096,
+  // DeepSeek
+  'deepseek-ai/deepseek-r1': 131072,
+  'deepseek-ai/deepseek-v4-pro': 131072,
+  'deepseek-ai/deepseek-v3.2-0324': 131072,
+  'deepseek-ai/deepseek-coder-6.7b-instruct': 32768,
+  // Qwen
+  'qwen/qwen3-235b-a22b': 131072,
+  'qwen/qwen3-32b': 131072,
+  'qwen/qwen2.5-coder-32b-instruct': 131072,
+  'qwen/qwen3-coder-480b-a35b-instruct': 131072,
+  // Mistral
+  'mistralai/mistral-large-3-675b-instruct-2512': 131072,
+  'mistralai/mixtral-8x22b-instruct-v0.1': 65536,
+  'mistralai/devstral-2-123b-instruct-2512': 131072,
+  'mistralai/magistral-3b-2506': 32768,
+  // Meta Llama
+  'meta/llama-3.1-405b-instruct': 131072,
+  'meta/llama-3.3-70b-instruct': 131072,
+  'meta/llama-3.1-8b-instruct': 131072,
+  'meta/llama-4-maverick-17b-128e-instruct': 131072,
+  'meta/llama4-scout-17b-16e-instruct': 131072,
+  // Google
+  'google/gemma-3-27b-it': 131072,
+  'google/gemma-3-12b-it': 131072,
+  'google/gemma-3-4b-it': 32768,
+  'google/codegemma-7b-it': 8192,
+  // Microsoft
+  'microsoft/phi-4': 16384,
+  'microsoft/phi-4-mini-instruct': 131072,
+  'microsoft/phi-4-multimodal-instruct': 16384,
+  'microsoft/phi-3.5-moe-instruct': 131072,
+  // Moonshot
+  'moonshotai/kimi-k2-instruct': 131072,
+  // MiniMax
+  'minimax/minimax-m1-80k': 81920,
+  // GLM
+  'z-ai/glm-4.5': 131072,
+  'z-ai/glm-4.7': 131072,
+  'z-ai/glm-5': 131072,
 };
 
 const DEFAULT_CONTEXT_WINDOW = 8192;
