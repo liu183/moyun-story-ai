@@ -7,6 +7,7 @@ export interface Novel {
   description: string | null;
   targetWordCount: number | null;
   architecture: string | null;
+  outline: string | null;
   createdAt: string;
   updatedAt: string;
   _count?: {
@@ -63,7 +64,7 @@ export interface Chapter {
   updatedAt: string;
 }
 
-type TabType = 'architecture' | 'characters' | 'worldview' | 'outline' | 'chapters' | 'settings';
+export type TabType = 'architecture' | 'characters' | 'worldview' | 'outline' | 'chapters' | 'settings';
 
 interface NovelStore {
   // Novel data
@@ -117,6 +118,16 @@ interface NovelStore {
 
   // Actions - World Settings
   loadWorldSettings: () => Promise<void>;
+  addWorldSetting: (data: { category: string; name: string; description?: string }) => Promise<WorldSetting>;
+  updateWorldSetting: (id: string, data: Partial<WorldSetting>) => Promise<void>;
+  deleteWorldSetting: (id: string) => Promise<void>;
+
+  // Actions - Relationships
+  relationships: CharacterRelationship[];
+  loadRelationships: () => Promise<void>;
+  addRelationship: (data: { fromCharacterId: string; toCharacterId: string; relationshipType: string; description?: string }) => Promise<CharacterRelationship>;
+  updateRelationship: (id: string, data: Partial<CharacterRelationship>) => Promise<void>;
+  deleteRelationship: (id: string) => Promise<void>;
 
   // Actions - Outline
   generateOutline: (chapterCount?: number) => Promise<string>;
@@ -208,6 +219,7 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
   streamingContent: '',
   models: [],
   selectedModel: '',
+  relationships: [],
 
   // Novel actions
   loadNovels: async () => {
@@ -258,6 +270,7 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
         characters: data.characters || [],
         chapters: data.chapters || [],
         worldSettings: data.worldSettings || [],
+        relationships: data.characterRelationships || [],
       });
     } catch {
       // Keep the basic novel data
@@ -391,6 +404,92 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
   loadWorldSettings: async () => {
     const { currentNovel } = get();
     if (!currentNovel) return;
+    const res = await fetch(`/api/novels/${currentNovel.id}/world-settings`);
+    const data = await res.json();
+    set({ worldSettings: data });
+  },
+
+  addWorldSetting: async (data) => {
+    const { currentNovel } = get();
+    if (!currentNovel) throw new Error('请先选择一个小说');
+    const res = await fetch(`/api/novels/${currentNovel.id}/world-settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const setting = await res.json();
+    set((s) => ({ worldSettings: [...s.worldSettings, setting] }));
+    return setting;
+  },
+
+  updateWorldSetting: async (id, data) => {
+    const { currentNovel } = get();
+    if (!currentNovel) return;
+    await fetch(`/api/novels/${currentNovel.id}/world-settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settingId: id, ...data }),
+    });
+    set((s) => ({
+      worldSettings: s.worldSettings.map((ws) => (ws.id === id ? { ...ws, ...data } : ws)),
+    }));
+  },
+
+  deleteWorldSetting: async (id) => {
+    const { currentNovel } = get();
+    if (!currentNovel) return;
+    await fetch(`/api/novels/${currentNovel.id}/world-settings`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settingId: id }),
+    });
+    set((s) => ({ worldSettings: s.worldSettings.filter((ws) => ws.id !== id) }));
+  },
+
+  // Relationships
+  loadRelationships: async () => {
+    const { currentNovel } = get();
+    if (!currentNovel) return;
+    const res = await fetch(`/api/novels/${currentNovel.id}/relationships`);
+    const data = await res.json();
+    set({ relationships: data });
+  },
+
+  addRelationship: async (data) => {
+    const { currentNovel } = get();
+    if (!currentNovel) throw new Error('请先选择一个小说');
+    const res = await fetch(`/api/novels/${currentNovel.id}/relationships`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const relationship = await res.json();
+    set((s) => ({ relationships: [...s.relationships, relationship] }));
+    return relationship;
+  },
+
+  updateRelationship: async (id, data) => {
+    const { currentNovel } = get();
+    if (!currentNovel) return;
+    await fetch(`/api/novels/${currentNovel.id}/relationships`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ relationshipId: id, ...data }),
+    });
+    set((s) => ({
+      relationships: s.relationships.map((r) => (r.id === id ? { ...r, ...data } : r)),
+    }));
+  },
+
+  deleteRelationship: async (id) => {
+    const { currentNovel } = get();
+    if (!currentNovel) return;
+    await fetch(`/api/novels/${currentNovel.id}/relationships`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ relationshipId: id }),
+    });
+    set((s) => ({ relationships: s.relationships.filter((r) => r.id !== id) }));
   },
 
   // Outline
@@ -412,7 +511,15 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
         }
       );
 
-      set({ isGenerating: false, generatingTarget: null });
+      // Refresh novel from DB to get the auto-saved outline
+      const res = await fetch(`/api/novels/${currentNovel.id}`);
+      const novel = await res.json();
+      set({
+        isGenerating: false,
+        generatingTarget: null,
+        currentNovel: novel,
+      });
+
       return text;
     } catch (error) {
       set({ isGenerating: false, generatingTarget: null });

@@ -9,8 +9,7 @@ import WorldView from '@/components/WorldView';
 import OutlineView from '@/components/OutlineView';
 import ChapterManager from '@/components/ChapterManager';
 import NovelSettings from '@/components/NovelSettings';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ModelConfig from '@/components/ModelConfig';
 import {
   BookOpen, Users, Globe, List, FileText, Settings,
   Sparkles, Book,
@@ -26,7 +25,7 @@ const tabs: { value: TabType; label: string; icon: React.ReactNode }[] = [
 ];
 
 export default function Home() {
-  const { currentNovel, activeTab, setActiveTab, loadNovels, sidebarOpen } = useNovelStore();
+  const { currentNovel, activeTab, setActiveTab, loadNovels } = useNovelStore();
 
   useEffect(() => {
     loadNovels();
@@ -73,9 +72,12 @@ export default function Home() {
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span className="hidden sm:inline">AI驱动</span>
+                <div className="flex items-center gap-3">
+                  <ModelConfig />
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden sm:inline">AI驱动</span>
+                  </div>
                 </div>
               </div>
             </div>

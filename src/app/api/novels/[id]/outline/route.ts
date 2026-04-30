@@ -8,6 +8,7 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const body = await request.json();
 
     const novel = await db.novel.findUnique({
       where: { id },
@@ -55,7 +56,43 @@ ${novel.architecture || '暂无'}
 
     const stream = buildSSEStream(messages);
 
-    return new Response(stream, {
+    // Capture full text for auto-save
+    let fullText = '';
+
+    const transformStream = new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        const text = new TextDecoder().decode(chunk);
+        const lines = text.split('\n');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'chunk') {
+                fullText += data.content;
+              }
+            } catch { /* skip parse errors */ }
+          }
+        }
+        controller.enqueue(chunk);
+      },
+      async flush() {
+        if (fullText) {
+          try {
+            await db.novel.update({
+              where: { id },
+              data: { outline: fullText },
+            });
+            console.log('Outline auto-saved to database');
+          } catch (err) {
+            console.error('Failed to auto-save outline:', err);
+          }
+        }
+      },
+    });
+
+    const combinedStream = stream.pipeThrough(transformStream);
+
+    return new Response(combinedStream, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
@@ -65,5 +102,25 @@ ${novel.architecture || '暂无'}
   } catch (error) {
     console.error('Outline generation error:', error);
     return NextResponse.json({ error: '大纲生成失败' }, { status: 500 });
+  }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const novel = await db.novel.findUnique({
+      where: { id },
+      select: { outline: true },
+    });
+    if (!novel) {
+      return NextResponse.json({ error: '小说不存在' }, { status: 404 });
+    }
+    return NextResponse.json({ outline: novel.outline });
+  } catch (error) {
+    console.error('Failed to fetch outline:', error);
+    return NextResponse.json({ error: '获取大纲失败' }, { status: 500 });
   }
 }

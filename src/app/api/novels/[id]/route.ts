@@ -44,6 +44,7 @@ export async function PUT(
         ...(body.description !== undefined && { description: body.description?.trim() || null }),
         ...(body.targetWordCount !== undefined && { targetWordCount: body.targetWordCount || null }),
         ...(body.architecture !== undefined && { architecture: body.architecture }),
+        ...(body.outline !== undefined && { outline: body.outline }),
       },
     });
 
