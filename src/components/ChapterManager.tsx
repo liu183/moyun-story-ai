@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNovelStore } from '@/store/novelStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,12 +9,164 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import ReactMarkdown from 'react-markdown';
 import {
   Plus, Trash2, Sparkles, Loader2, FileText,
   ChevronDown, ChevronUp, BookOpen, Edit3, Save, X, Play,
+  History, Download, Eye, PenLine, BarChart3,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+function WordCountBar({ chapters }: { chapters: Array<{ wordCount: number; content: string | null }> }) {
+  const totalWords = chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+  const generatedCount = chapters.filter((ch) => ch.content).length;
+  const avgWords = generatedCount > 0 ? Math.round(totalWords / generatedCount) : 0;
+  const readTimeMinutes = Math.max(1, Math.ceil(totalWords / 500));
+
+  return (
+    <div className="flex items-center gap-4 py-2 px-3 rounded-lg bg-muted/30 border border-border text-xs">
+      <div className="flex items-center gap-1.5">
+        <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+        <span className="text-muted-foreground">总字数</span>
+        <span className="font-mono font-medium text-foreground">{totalWords.toLocaleString()}</span>
+      </div>
+      <div className="h-3 w-px bg-border" />
+      <div className="flex items-center gap-1.5">
+        <FileText className="w-3.5 h-3.5 text-emerald-400" />
+        <span className="text-muted-foreground">已生成</span>
+        <span className="font-mono font-medium text-foreground">{generatedCount}/{chapters.length}章</span>
+      </div>
+      <div className="h-3 w-px bg-border" />
+      <div className="flex items-center gap-1.5">
+        <span className="text-muted-foreground">章均</span>
+        <span className="font-mono font-medium text-foreground">{avgWords.toLocaleString()}字</span>
+      </div>
+      <div className="h-3 w-px bg-border" />
+      <div className="flex items-center gap-1.5">
+        <span className="text-muted-foreground">阅读时长</span>
+        <span className="font-mono font-medium text-foreground">约{readTimeMinutes}分钟</span>
+      </div>
+    </div>
+  );
+}
+
+function VersionHistoryDialog({
+  novelId,
+  chapterId,
+  open,
+  onClose,
+  onRestore,
+}: {
+  novelId: string;
+  chapterId: string;
+  open: boolean;
+  onClose: () => void;
+  onRestore: (versionId: string) => void;
+}) {
+  const [versions, setVersions] = useState<Array<{
+    id: string;
+    title: string;
+    wordCount: number;
+    versionLabel: string;
+    createdAt: string;
+  }>>([]);
+  const [loading, setLoading] = useState(false);
+  const [restoring, setRestoring] = useState<string | null>(null);
+
+  const loadVersions = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/novels/${novelId}/chapters/${chapterId}/versions`);
+      const data = await res.json();
+      setVersions(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error('加载版本历史失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [novelId, chapterId]);
+
+  useState(() => {
+    if (open) loadVersions();
+  });
+
+  const handleRestore = async (versionId: string) => {
+    setRestoring(versionId);
+    try {
+      const res = await fetch(`/api/novels/${novelId}/chapters/${chapterId}/versions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ versionId }),
+      });
+      if (!res.ok) throw new Error('恢复失败');
+      toast.success('版本已恢复');
+      onRestore(versionId);
+      onClose();
+    } catch {
+      toast.error('恢复版本失败');
+    } finally {
+      setRestoring(null);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); else loadVersions(); }}>
+      <DialogContent className="bg-card border-border max-w-lg max-h-[80vh]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <History className="w-4 h-4" /> 版本历史
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-2">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : versions.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">暂无版本记录</p>
+          ) : (
+            <ScrollArea className="max-h-60">
+              <div className="space-y-2 pr-3">
+                {versions.map((ver) => (
+                  <div
+                    key={ver.id}
+                    className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{ver.versionLabel}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {ver.wordCount.toLocaleString()}字 · {new Date(ver.createdAt).toLocaleString('zh-CN')}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleRestore(ver.id)}
+                      disabled={restoring === ver.id}
+                      className="shrink-0 ml-2 text-xs"
+                    >
+                      {restoring === ver.id ? (
+                        <><Loader2 className="w-3 h-3 animate-spin mr-1" /> 恢复中</>
+                      ) : (
+                        '恢复'
+                      )}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>关闭</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function ChapterManager() {
   const {
@@ -31,6 +183,8 @@ export default function ChapterManager() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const [previewMode, setPreviewMode] = useState<Record<string, 'markdown' | 'edit'>>({});
+  const [versionDialog, setVersionDialog] = useState<{ novelId: string; chapterId: string } | null>(null);
 
   const handleAdd = async () => {
     await addChapter({ title: newTitle, outline: newOutline });
@@ -66,7 +220,6 @@ export default function ChapterManager() {
     setDeleteConfirm(null);
   };
 
-  const totalWords = chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
   const generatedCount = chapters.filter((ch) => ch.content).length;
   const unGenerated = chapters.filter((ch) => !ch.content);
 
@@ -88,6 +241,19 @@ export default function ChapterManager() {
     }
   };
 
+  const handleExport = (format: string) => {
+    if (!currentNovel) return;
+    const url = `/api/novels/${currentNovel.id}/export?format=${format}`;
+    window.open(url, '_blank');
+    toast.success(`正在导出 ${format.toUpperCase()} 文件...`);
+  };
+
+  const handleVersionRestore = (versionId: string) => {
+    // Reload chapters after restore - use loadChapters from store if needed
+    // For now, just trigger a page refresh effect
+    window.location.reload();
+  };
+
   if (!currentNovel) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -97,15 +263,28 @@ export default function ChapterManager() {
   }
 
   return (
-    <div className="h-full flex flex-col gap-4">
+    <div className="h-full flex flex-col gap-3">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold">章节管理</h2>
           <p className="text-sm text-muted-foreground">
-            《{currentNovel.title}》· {chapters.length}章 · 已生成{generatedCount}章 · 共{totalWords.toLocaleString()}字
+            《{currentNovel.title}》· {chapters.length}章
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Export buttons */}
+          <Select onValueChange={handleExport}>
+            <SelectTrigger className="w-24 h-8 text-xs bg-transparent border-border">
+              <Download className="w-3.5 h-3.5 mr-1" />
+              <SelectValue placeholder="导出" />
+            </SelectTrigger>
+            <SelectContent className="bg-card border-border">
+              <SelectItem value="txt" className="text-xs">导出 TXT</SelectItem>
+              <SelectItem value="docx" className="text-xs">导出 DOC</SelectItem>
+            </SelectContent>
+          </Select>
+
           {unGenerated.length > 0 && (
             <Button
               size="sm"
@@ -126,6 +305,12 @@ export default function ChapterManager() {
         </div>
       </div>
 
+      {/* Word count bar */}
+      {chapters.length > 0 && (
+        <WordCountBar chapters={chapters} />
+      )}
+
+      {/* Chapter list */}
       <ScrollArea className="flex-1">
         {chapters.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -139,6 +324,7 @@ export default function ChapterManager() {
               const isGeneratingThis = generatingTarget === `chapter-${chapter.id}` && isGenerating;
               const isExpanded = expandedChapter === chapter.id;
               const isEditing = editingChapter === chapter.id;
+              const currentPreviewMode = previewMode[chapter.id] || (isEditing ? 'edit' : 'markdown');
 
               return (
                 <Card key={chapter.id} className={`transition-all ${isGeneratingThis ? 'border-amber-500/50 bg-amber-500/5' : isEditing ? 'border-primary/30' : ''}`}>
@@ -182,10 +368,23 @@ export default function ChapterManager() {
                             )}
                           </Button>
                         )}
-                        {!isEditing && (
+                        {!isEditing && chapter.content && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setVersionDialog({ novelId: currentNovel.id, chapterId: chapter.id });
+                            }}
+                            className="p-1.5 hover:bg-accent rounded"
+                            title="版本历史"
+                          >
+                            <History className="w-3.5 h-3.5 text-muted-foreground" />
+                          </button>
+                        )}
+                        {!isEditing && chapter.content && (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleEdit(chapter); }}
                             className="p-1.5 hover:bg-accent rounded"
+                            title="编辑"
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                           </button>
@@ -194,6 +393,7 @@ export default function ChapterManager() {
                           <button
                             onClick={(e) => { e.stopPropagation(); setDeleteConfirm(chapter.id); }}
                             className="p-1.5 hover:bg-destructive/20 rounded"
+                            title="删除"
                           >
                             <Trash2 className="w-3.5 h-3.5 text-destructive" />
                           </button>
@@ -228,15 +428,91 @@ export default function ChapterManager() {
                     {/* Streaming content */}
                     {isGeneratingThis && streamingContent && (
                       <div className="mt-3 pt-3 border-t border-border">
-                        <pre className="text-sm text-foreground/90 whitespace-pre-wrap max-h-60 overflow-y-auto font-sans leading-relaxed">
-                          {streamingContent}
+                        <div className="prose prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground/90 prose-strong:text-foreground text-sm max-h-60 overflow-y-auto">
+                          <ReactMarkdown>{streamingContent}</ReactMarkdown>
                           <span className="inline-block w-1.5 h-3 bg-amber-400 animate-pulse ml-0.5" />
-                        </pre>
+                        </div>
                       </div>
                     )}
 
-                    {/* Edit mode */}
-                    {isExpanded && isEditing && (
+                    {/* Expanded content with view/edit toggle */}
+                    {isExpanded && chapter.content && !isGeneratingThis && (
+                      <div className="mt-3 pt-3 border-t border-border">
+                        {/* Toggle buttons for markdown/edit */}
+                        {!isEditing && (
+                          <div className="flex items-center gap-1 mb-3">
+                            <button
+                              onClick={() => setPreviewMode({ ...previewMode, [chapter.id]: 'markdown' })}
+                              className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                                currentPreviewMode === 'markdown'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'text-muted-foreground hover:bg-accent'
+                              }`}
+                            >
+                              <Eye className="w-3 h-3" /> 预览
+                            </button>
+                            <button
+                              onClick={() => {
+                                setPreviewMode({ ...previewMode, [chapter.id]: 'edit' });
+                                handleEdit(chapter);
+                              }}
+                              className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors ${
+                                currentPreviewMode === 'edit'
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'text-muted-foreground hover:bg-accent'
+                              }`}
+                            >
+                              <PenLine className="w-3 h-3" /> 编辑
+                            </button>
+                          </div>
+                        )}
+
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-xs font-medium text-muted-foreground mb-1 block">章节标题</label>
+                              <Input
+                                value={editForm.title}
+                                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                                className="text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-muted-foreground mb-1 block">章节大纲</label>
+                              <Textarea
+                                value={editForm.outline}
+                                onChange={(e) => setEditForm({ ...editForm, outline: e.target.value })}
+                                placeholder="本章的情节安排..."
+                                rows={2}
+                                className="text-sm"
+                              />
+                            </div>
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-xs font-medium text-muted-foreground">章节内容</label>
+                                <span className="text-xs text-muted-foreground">
+                                  {editForm.content.replace(/\s/g, '').length.toLocaleString()}字
+                                </span>
+                              </div>
+                              <Textarea
+                                value={editForm.content}
+                                onChange={(e) => setEditForm({ ...editForm, content: e.target.value })}
+                                placeholder="本章正文内容..."
+                                rows={14}
+                                className="text-sm font-sans leading-relaxed"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="prose prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground/90 prose-strong:text-foreground prose-blockquote:border-amber-500/50 prose-code:text-amber-300 prose-code:bg-muted/50 prose-code:px-1 prose-code:py-0.5 prose-code:rounded text-sm max-h-[500px] overflow-y-auto leading-relaxed">
+                            <ReactMarkdown>{chapter.content}</ReactMarkdown>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Edit mode for chapters without content */}
+                    {isExpanded && isEditing && !chapter.content && (
                       <div className="mt-3 pt-3 border-t border-border space-y-3">
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">章节标题</label>
@@ -272,15 +548,7 @@ export default function ChapterManager() {
                       </div>
                     )}
 
-                    {/* Read-only expanded content */}
-                    {isExpanded && !isEditing && !isGeneratingThis && chapter.content && (
-                      <div className="mt-3 pt-3 border-t border-border">
-                        <div className="prose prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground/90 prose-strong:text-foreground text-sm max-h-96 overflow-y-auto">
-                          <ReactMarkdown>{chapter.content}</ReactMarkdown>
-                        </div>
-                      </div>
-                    )}
-
+                    {/* Read-only: outline only (no content) */}
                     {isExpanded && !isEditing && !isGeneratingThis && !chapter.content && chapter.outline && (
                       <div className="mt-3 pt-3 border-t border-border">
                         <p className="text-xs text-muted-foreground mb-1">章节大纲：</p>
@@ -343,6 +611,17 @@ export default function ChapterManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Version history dialog */}
+      {versionDialog && (
+        <VersionHistoryDialog
+          novelId={versionDialog.novelId}
+          chapterId={versionDialog.chapterId}
+          open={!!versionDialog}
+          onClose={() => setVersionDialog(null)}
+          onRestore={handleVersionRestore}
+        />
+      )}
     </div>
   );
 }

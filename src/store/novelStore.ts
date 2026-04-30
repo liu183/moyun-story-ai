@@ -99,6 +99,7 @@ interface NovelStore {
   // AI parameters
   temperature: number;
   maxTokens: number;
+  topP: number;
 
   // Actions - Novels
   loadNovels: () => Promise<void>;
@@ -150,6 +151,7 @@ interface NovelStore {
   setSelectedModel: (model: string) => void;
   setTemperature: (t: number) => void;
   setMaxTokens: (t: number) => void;
+  setTopP: (p: number) => void;
 
   // Actions - Streaming
   setStreamingContent: (content: string) => void;
@@ -227,6 +229,7 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
   selectedModel: '',
   temperature: 0.7,
   maxTokens: 4096,
+  topP: 0.9,
   relationships: [],
 
   // Novel actions
@@ -608,6 +611,7 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
           model: get().selectedModel || undefined,
           temperature: get().temperature,
           maxTokens: get().maxTokens,
+          topP: get().topP,
         },
         (chunk) => {
           set((s) => ({ streamingContent: s.streamingContent + chunk }));
@@ -678,6 +682,7 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
   setSelectedModel: (model) => set({ selectedModel: model }),
   setTemperature: (t) => set({ temperature: t }),
   setMaxTokens: (t) => set({ maxTokens: t }),
+  setTopP: (p) => set({ topP: p }),
 
   // Streaming helpers
   setStreamingContent: (content) => set({ streamingContent: content }),

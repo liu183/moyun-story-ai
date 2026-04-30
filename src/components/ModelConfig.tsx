@@ -28,17 +28,18 @@ const MODEL_NAMES: Record<string, string> = {
 };
 
 const MAX_TOKEN_OPTIONS = [
-  { value: 2048, label: '2048' },
-  { value: 4096, label: '4096' },
-  { value: 8192, label: '8192' },
-  { value: 12288, label: '12288' },
-  { value: 16384, label: '16384' },
+  { value: 2048, label: '2K' },
+  { value: 4096, label: '4K' },
+  { value: 8192, label: '8K' },
+  { value: 12288, label: '12K' },
+  { value: 16384, label: '16K' },
 ];
 
 export default function ModelConfig() {
   const {
     models, selectedModel, loadModels, setSelectedModel,
-    temperature, maxTokens, setTemperature, setMaxTokens,
+    temperature, maxTokens, topP,
+    setTemperature, setMaxTokens, setTopP,
   } = useNovelStore();
 
   useEffect(() => {
@@ -53,7 +54,7 @@ export default function ModelConfig() {
     <div className="flex items-center gap-2">
       <Cpu className="h-4 w-4 text-muted-foreground" />
       <Select value={selectedModel} onValueChange={setSelectedModel}>
-        <SelectTrigger className="w-56 h-8 text-xs bg-transparent border-border">
+        <SelectTrigger className="w-52 h-8 text-xs bg-transparent border-border">
           <SelectValue placeholder="选择AI模型" />
         </SelectTrigger>
         <SelectContent className="bg-card border-border">
@@ -71,7 +72,7 @@ export default function ModelConfig() {
             <Settings2 className="w-4 h-4" />
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-72 bg-card border-border" side="bottom" align="end">
+        <PopoverContent className="w-80 bg-card border-border" side="bottom" align="end">
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Settings2 className="w-4 h-4 text-muted-foreground" />
@@ -95,6 +96,26 @@ export default function ModelConfig() {
               <div className="flex justify-between text-[10px] text-muted-foreground">
                 <span>严谨 0.1</span>
                 <span>创意 1.5</span>
+              </div>
+            </div>
+
+            {/* Top P */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-muted-foreground">核采样 (Top P)</label>
+                <span className="text-xs font-mono text-amber-400">{topP.toFixed(2)}</span>
+              </div>
+              <Slider
+                value={[topP]}
+                onValueChange={(v) => setTopP(v[0])}
+                min={0.1}
+                max={1.0}
+                step={0.05}
+                className="w-full"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>聚焦 0.1</span>
+                <span>多样 1.0</span>
               </div>
             </div>
 

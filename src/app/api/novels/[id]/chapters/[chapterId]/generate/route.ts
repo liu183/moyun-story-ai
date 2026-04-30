@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { buildSSEStream } from '@/lib/nvidia';
+import { buildSSEStream, smartTruncate } from '@/lib/nvidia';
 
 export async function POST(
   request: NextRequest,
@@ -9,7 +9,7 @@ export async function POST(
   try {
     const { id, chapterId } = await params;
     const body = await request.json();
-    const { model, temperature, maxTokens } = body;
+    const { model, temperature, maxTokens, topP } = body;
 
     const novel = await db.novel.findUnique({
       where: { id },
@@ -29,12 +29,47 @@ export async function POST(
       return NextResponse.json({ error: '章节不存在' }, { status: 404 });
     }
 
-    // Get previous chapter content for context (last 1000 chars)
+    // Save current version before regeneration
+    if (currentChapter.content) {
+      try {
+        await db.chapterVersion.create({
+          data: {
+            chapterId: currentChapter.id,
+            novelId: id,
+            chapterNumber: currentChapter.chapterNumber,
+            title: currentChapter.title,
+            content: currentChapter.content,
+            wordCount: currentChapter.wordCount,
+            versionLabel: '重写前自动保存',
+          },
+        });
+        // Clean up old versions (keep last 20)
+        const allVersions = await db.chapterVersion.findMany({
+          where: { chapterId: currentChapter.id },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        });
+        if (allVersions.length > 20) {
+          await db.chapterVersion.deleteMany({
+            where: { id: { in: allVersions.slice(20).map(v => v.id) } },
+          });
+        }
+      } catch (verErr) {
+        console.warn('Failed to save chapter version:', verErr);
+      }
+    }
+
+    // Get previous chapter content for context
     const prevChapter = novel.chapters
       .filter(c => c.chapterNumber < currentChapter.chapterNumber)
       .pop();
 
-    // Build rich character info including appearance and background
+    // Get next chapter outline for forward context
+    const nextChapter = novel.chapters
+      .filter(c => c.chapterNumber > currentChapter.chapterNumber)
+      .shift();
+
+    // Build rich character info
     const charSummary = novel.characters.map(c => {
       let info = `【${c.name}】（${c.role || '角色'}）`;
       if (c.personality) info += `\n  性格：${c.personality}`;
@@ -43,13 +78,26 @@ export async function POST(
       return info;
     }).join('\n');
 
-    // Build world settings summary if available
+    // Build world settings summary
     const worldSettingsSummary = novel.worldSettings.length > 0
       ? novel.worldSettings.map(ws => `${ws.category} - ${ws.name}：${ws.description || ''}`).join('\n')
       : null;
 
-    // Build outline section from novel.outline (trim to 1500 chars)
-    const outlineSection = novel.outline ? novel.outline.substring(0, 1500) : null;
+    // Smart context truncation - prioritize important context
+    const sections = [
+      { text: novel.architecture || '暂无', priority: 5 },
+      { text: novel.outline || '', priority: 4 },
+      { text: worldSettingsSummary || '', priority: 3 },
+      { text: charSummary || '暂无', priority: 3 },
+      { text: prevChapter ? `上一章（${prevChapter.title}）结尾：\n${prevChapter.content || '暂无内容'}` : '', priority: 2 },
+      { text: nextChapter ? `下一章预告（${nextChapter.title}）：\n${nextChapter.outline || ''}` : '', priority: 1 },
+    ];
+
+    const modelToUse = model || 'nvidia/llama-3.3-nemotron-70b-instruct';
+    const maxTokensVal = maxTokens || 8192;
+    const truncated = smartTruncate(modelToUse, maxTokensVal, sections);
+
+    const [architectureText, outlineText, worldText, charText, prevText, nextText] = truncated;
 
     const messages = [
       {
@@ -71,21 +119,22 @@ export async function POST(
 类型：${novel.genre || ''}
 
 故事架构概要：
-${novel.architecture ? novel.architecture.substring(0, 1000) : '暂无'}
+${architectureText}
 
-${outlineSection ? `故事大纲：
-${outlineSection}
+${outlineText ? `故事大纲：
+${outlineText}
 
-` : ''}${worldSettingsSummary ? `世界设定：
-${worldSettingsSummary}
+` : ''}${worldText ? `世界设定：
+${worldText}
 
 ` : ''}角色介绍：
-${charSummary || '暂无'}
+${charText}
 
-${prevChapter ? `上一章（${prevChapter.title}）结尾：
-${prevChapter.content ? prevChapter.content.substring(Math.max(0, prevChapter.content.length - 1000)) : '暂无内容'}
+${prevText ? `${prevText}
+
+` : ''}${nextText ? `${nextText}
+
 ` : ''}
-
 当前章节：${currentChapter.title}
 章节大纲：${currentChapter.outline || '无大纲，请自由创作'}
 
@@ -93,7 +142,11 @@ ${prevChapter.content ? prevChapter.content.substring(Math.max(0, prevChapter.co
       },
     ];
 
-    const stream = buildSSEStream(messages, model || undefined, { temperature, maxTokens });
+    const stream = buildSSEStream(
+      messages,
+      model || undefined,
+      { temperature, maxTokens: maxTokensVal, topP },
+    );
 
     const encoder = new TextEncoder();
     let fullText = '';
