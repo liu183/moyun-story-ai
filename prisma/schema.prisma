@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Novel {
+  id              String   @id @default(cuid())
+  title           String
+  genre           String?
+  description     String?
+  targetWordCount Int?
+  architecture    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  characters           Character[]
+  characterRelationships CharacterRelationship[]
+  worldSettings        WorldSetting[]
+  chapters             Chapter[]
+}
+
+model Character {
+  id          String   @id @default(cuid())
+  novelId     String
+  name        String
+  role        String?
+  description String?
+  personality String?
+  background  String?
+  appearance  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  novel              Novel                   @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  relationshipsTo    CharacterRelationship[] @relation("CharacterTo")
+  relationshipsFrom  CharacterRelationship[] @relation("CharacterFrom")
+}
+
+model CharacterRelationship {
+  id                String   @id @default(cuid())
+  novelId           String
+  fromCharacterId   String
+  toCharacterId     String
+  relationshipType  String
+  description       String?
+
+  novel         Novel     @relation(fields: [novelId], references: [id], onDelete: Cascade)
+  fromCharacter Character @relation("CharacterFrom", fields: [fromCharacterId], references: [id], onDelete: Cascade)
+  toCharacter   Character @relation("CharacterTo", fields: [toCharacterId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WorldSetting {
+  id          String   @id @default(cuid())
+  novelId     String
+  category    String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  novel Novel @relation(fields: [novelId], references: [id], onDelete: Cascade)
+}
+
+model Chapter {
+  id            String   @id @default(cuid())
+  novelId       String
+  chapterNumber Int
+  title         String
+  outline       String?
+  content       String?
+  wordCount     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  novel Novel @relation(fields: [novelId], references: [id], onDelete: Cascade)
+}
