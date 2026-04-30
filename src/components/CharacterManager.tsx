@@ -16,7 +16,7 @@ import {
 
 export default function CharacterManager() {
   const {
-    currentNovel, characters, isGenerating, generatingTarget, streamingText,
+    currentNovel, characters, isGenerating, generatingTarget, streamingContent,
     addCharacter, updateCharacter, deleteCharacter, generateCharacters,
   } = useNovelStore();
 
@@ -96,7 +96,7 @@ export default function CharacterManager() {
       </div>
 
       {/* Streaming display */}
-      {isGenerating && generatingTarget === 'characters' && streamingText && (
+      {isGenerating && generatingTarget === 'characters' && streamingContent && (
         <Card className="border-amber-500/30 bg-amber-500/5">
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-2">
@@ -104,7 +104,7 @@ export default function CharacterManager() {
               <span className="text-sm text-amber-300">正在生成角色...</span>
             </div>
             <pre className="text-xs text-muted-foreground whitespace-pre-wrap max-h-40 overflow-y-auto font-mono">
-              {streamingText}
+              {streamingContent}
             </pre>
           </CardContent>
         </Card>

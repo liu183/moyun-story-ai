@@ -12,7 +12,7 @@ import ReactMarkdown from 'react-markdown';
 
 export default function ArchitectureView() {
   const {
-    currentNovel, isGenerating, generatingTarget, streamingText,
+    currentNovel, isGenerating, generatingTarget, streamingContent,
     generateArchitecture, saveArchitecture,
   } = useNovelStore();
 
@@ -21,14 +21,14 @@ export default function ArchitectureView() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const displayText = generatingTarget === 'architecture' && isGenerating
-    ? streamingText
+    ? streamingContent
     : currentNovel?.architecture || '';
 
   useEffect(() => {
     if (generatingTarget === 'architecture' && isGenerating && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [streamingText, generatingTarget, isGenerating]);
+  }, [streamingContent, generatingTarget, isGenerating]);
 
   const handleSave = async () => {
     await saveArchitecture(editText);

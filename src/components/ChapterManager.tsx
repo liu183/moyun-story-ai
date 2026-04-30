@@ -16,7 +16,7 @@ import {
 
 export default function ChapterManager() {
   const {
-    currentNovel, chapters, isGenerating, generatingTarget, streamingText,
+    currentNovel, chapters, isGenerating, generatingTarget, streamingContent,
     addChapter, generateChapter, deleteChapter,
   } = useNovelStore();
 
@@ -117,10 +117,10 @@ export default function ChapterManager() {
                     </div>
 
                     {/* Streaming content */}
-                    {isGeneratingThis && streamingText && (
+                    {isGeneratingThis && streamingContent && (
                       <div className="mt-3 pt-3 border-t border-border">
                         <pre className="text-sm text-foreground/90 whitespace-pre-wrap max-h-60 overflow-y-auto font-sans leading-relaxed">
-                          {streamingText}
+                          {streamingContent}
                           <span className="inline-block w-1.5 h-3 bg-amber-400 animate-pulse ml-0.5" />
                         </pre>
                       </div>

@@ -10,21 +10,21 @@ import ReactMarkdown from 'react-markdown';
 
 export default function OutlineView() {
   const {
-    currentNovel, isGenerating, generatingTarget, streamingText,
+    currentNovel, isGenerating, generatingTarget, streamingContent,
     generateOutline,
   } = useNovelStore();
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const displayText = generatingTarget === 'outline' && isGenerating
-    ? streamingText
+    ? streamingContent
     : null;
 
   useEffect(() => {
     if (generatingTarget === 'outline' && isGenerating && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [streamingText, generatingTarget, isGenerating]);
+  }, [streamingContent, generatingTarget, isGenerating]);
 
   if (!currentNovel) {
     return (
