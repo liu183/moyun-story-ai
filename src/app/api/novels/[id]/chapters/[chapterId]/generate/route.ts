@@ -8,12 +8,15 @@ export async function POST(
 ) {
   try {
     const { id, chapterId } = await params;
+    const body = await request.json();
+    const { model, temperature, maxTokens } = body;
 
     const novel = await db.novel.findUnique({
       where: { id },
       include: {
         characters: true,
         chapters: { orderBy: { chapterNumber: 'asc' } },
+        worldSettings: true,
       },
     });
 
@@ -26,12 +29,27 @@ export async function POST(
       return NextResponse.json({ error: '章节不存在' }, { status: 404 });
     }
 
-    // Get previous chapter content for context
+    // Get previous chapter content for context (last 1000 chars)
     const prevChapter = novel.chapters
       .filter(c => c.chapterNumber < currentChapter.chapterNumber)
       .pop();
 
-    const charSummary = novel.characters.map(c => `${c.name}（${c.role || '角色'}）：${c.personality || ''}`).join('\n');
+    // Build rich character info including appearance and background
+    const charSummary = novel.characters.map(c => {
+      let info = `【${c.name}】（${c.role || '角色'}）`;
+      if (c.personality) info += `\n  性格：${c.personality}`;
+      if (c.appearance) info += `\n  外貌：${c.appearance}`;
+      if (c.background) info += `\n  背景：${c.background}`;
+      return info;
+    }).join('\n');
+
+    // Build world settings summary if available
+    const worldSettingsSummary = novel.worldSettings.length > 0
+      ? novel.worldSettings.map(ws => `${ws.category} - ${ws.name}：${ws.description || ''}`).join('\n')
+      : null;
+
+    // Build outline section from novel.outline (trim to 1500 chars)
+    const outlineSection = novel.outline ? novel.outline.substring(0, 1500) : null;
 
     const messages = [
       {
@@ -55,11 +73,17 @@ export async function POST(
 故事架构概要：
 ${novel.architecture ? novel.architecture.substring(0, 1000) : '暂无'}
 
-角色介绍：
+${outlineSection ? `故事大纲：
+${outlineSection}
+
+` : ''}${worldSettingsSummary ? `世界设定：
+${worldSettingsSummary}
+
+` : ''}角色介绍：
 ${charSummary || '暂无'}
 
 ${prevChapter ? `上一章（${prevChapter.title}）结尾：
-${prevChapter.content ? prevChapter.content.substring(Math.max(0, prevChapter.content.length - 500)) : '暂无内容'}
+${prevChapter.content ? prevChapter.content.substring(Math.max(0, prevChapter.content.length - 1000)) : '暂无内容'}
 ` : ''}
 
 当前章节：${currentChapter.title}
@@ -69,7 +93,7 @@ ${prevChapter.content ? prevChapter.content.substring(Math.max(0, prevChapter.co
       },
     ];
 
-    const stream = buildSSEStream(messages);
+    const stream = buildSSEStream(messages, model || undefined, { temperature, maxTokens });
 
     const encoder = new TextEncoder();
     let fullText = '';

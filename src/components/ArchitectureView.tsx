@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, Save, Edit3, Loader2, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { toast } from 'sonner';
 
 export default function ArchitectureView() {
   const {
@@ -23,6 +24,10 @@ export default function ArchitectureView() {
   const displayText = generatingTarget === 'architecture' && isGenerating
     ? streamingContent
     : currentNovel?.architecture || '';
+
+  const architectureWordCount = currentNovel?.architecture
+    ? currentNovel.architecture.replace(/\s/g, '').length
+    : 0;
 
   useEffect(() => {
     if (generatingTarget === 'architecture' && isGenerating && scrollRef.current) {
@@ -52,7 +57,14 @@ export default function ArchitectureView() {
     <div className="h-full flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold">故事架构</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold">故事架构</h2>
+            {architectureWordCount > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {architectureWordCount.toLocaleString()}字
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             为《{currentNovel.title}》构建完整的故事框架
           </p>
@@ -74,7 +86,13 @@ export default function ArchitectureView() {
             </Button>
           )}
           <Button
-            onClick={generateArchitecture}
+            onClick={() => {
+              generateArchitecture().then(() => {
+                toast.success('故事架构生成完成');
+              }).catch((err) => {
+                toast.error(err.message || '架构生成失败');
+              });
+            }}
             disabled={isGenerating}
             className="gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
           >

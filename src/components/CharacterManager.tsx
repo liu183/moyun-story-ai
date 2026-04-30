@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Sparkles, Plus, Trash2, Edit3, User, Loader2, Wand2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function CharacterManager() {
   const {
@@ -79,7 +80,13 @@ export default function CharacterManager() {
         </div>
         <div className="flex items-center gap-2">
           <Button
-            onClick={generateCharacters}
+            onClick={() => {
+              generateCharacters().then((chars) => {
+                toast.success(`成功生成 ${chars.length} 个角色`);
+              }).catch((err) => {
+                toast.error(err.message || '角色生成失败');
+              });
+            }}
             disabled={isGenerating}
             className="gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
           >

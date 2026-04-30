@@ -38,6 +38,7 @@ async function callNvidiaChat(
   messages: Array<{ role: string; content: string }>,
   model: string,
   stream: boolean = false,
+  options?: { temperature?: number; maxTokens?: number },
 ): Promise<Response> {
   const res = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
     method: 'POST',
@@ -48,8 +49,8 @@ async function callNvidiaChat(
     body: JSON.stringify({
       model,
       messages,
-      temperature: 0.7,
-      max_tokens: 8192,
+      temperature: options?.temperature ?? 0.7,
+      max_tokens: options?.maxTokens ?? 8192,
       stream,
     }),
   });
@@ -78,6 +79,7 @@ export async function streamChat(
   onDone: (fullText: string) => void,
   onError: (error: Error) => void,
   model?: string,
+  options?: { temperature?: number; maxTokens?: number },
 ): Promise<void> {
   const modelsToTry = model
     ? [model]
@@ -87,7 +89,7 @@ export async function streamChat(
 
   for (const m of modelsToTry) {
     try {
-      const res = await callNvidiaChat(messages, m, true);
+      const res = await callNvidiaChat(messages, m, true, options);
       const reader = res.body?.getReader();
       if (!reader) {
         throw new Error('无法获取响应流');
@@ -138,6 +140,7 @@ export async function streamChat(
 export function buildSSEStream(
   messages: Array<{ role: string; content: string }>,
   model?: string,
+  options?: { temperature?: number; maxTokens?: number },
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
 
@@ -160,6 +163,7 @@ export function buildSSEStream(
           controller.close();
         },
         model,
+        options,
       );
     },
   });

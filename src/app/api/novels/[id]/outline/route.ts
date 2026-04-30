@@ -9,6 +9,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
+    const { model, temperature, maxTokens } = body;
 
     const novel = await db.novel.findUnique({
       where: { id },
@@ -54,7 +55,7 @@ ${novel.architecture || '暂无'}
       },
     ];
 
-    const stream = buildSSEStream(messages);
+    const stream = buildSSEStream(messages, model || undefined, { temperature, maxTokens });
 
     // Capture full text for auto-save
     let fullText = '';

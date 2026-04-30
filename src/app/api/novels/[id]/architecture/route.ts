@@ -9,6 +9,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
+    const { model, temperature, maxTokens } = body;
 
     if (body.action === 'generate') {
       const novel = await db.novel.findUnique({ where: { id } });
@@ -34,7 +35,7 @@ export async function POST(
         },
       ];
 
-      const stream = buildSSEStream(messages);
+      const stream = buildSSEStream(messages, model || undefined, { temperature, maxTokens });
 
       // Also capture full text for auto-save
       const encoder = new TextEncoder();

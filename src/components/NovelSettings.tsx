@@ -6,16 +6,19 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Settings, Save, Check } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Settings, Save, Check, Download } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 export default function NovelSettings() {
-  const { currentNovel, updateNovel } = useNovelStore();
+  const { currentNovel, updateNovel, chapters } = useNovelStore();
   const [title, setTitle] = useState(currentNovel?.title || '');
   const [genre, setGenre] = useState(currentNovel?.genre || '');
   const [description, setDescription] = useState(currentNovel?.description || '');
   const [targetWordCount, setTargetWordCount] = useState(currentNovel?.targetWordCount?.toString() || '');
   const [saved, setSaved] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   if (!currentNovel) {
     return (
@@ -26,18 +29,48 @@ export default function NovelSettings() {
   }
 
   const handleSave = async () => {
-    await updateNovel(currentNovel.id, {
-      title,
-      genre,
-      description,
-      targetWordCount: targetWordCount ? parseInt(targetWordCount) : null,
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    try {
+      await updateNovel(currentNovel.id, {
+        title,
+        genre,
+        description,
+        targetWordCount: targetWordCount ? parseInt(targetWordCount) : null,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      toast.success('设置已保存');
+    } catch (error) {
+      toast.error('保存失败，请重试');
+    }
   };
 
-  const totalChapters = currentNovel._count?.chapters || 0;
+  const handleExportTXT = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/novels/${currentNovel.id}/export`);
+      if (!res.ok) throw new Error('导出失败');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentNovel.title}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success('导出成功');
+    } catch {
+      toast.error('导出失败，请重试');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const totalChapters = chapters.length || currentNovel._count?.chapters || 0;
   const totalChars = currentNovel._count?.characters || 0;
+  const completedChapters = chapters.filter((ch) => ch.content).length;
+  const completionPercent = totalChapters > 0 ? Math.round((completedChapters / totalChapters) * 100) : 0;
+  const totalWordCount = chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
 
   return (
     <div className="h-full flex flex-col gap-4">
@@ -48,7 +81,7 @@ export default function NovelSettings() {
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-amber-400">{totalChapters}</p>
@@ -64,12 +97,50 @@ export default function NovelSettings() {
         <Card>
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-bold text-amber-400">
-              {currentNovel.architecture ? '已生成' : '未生成'}
+              {totalWordCount > 0 ? `${(totalWordCount / 10000).toFixed(1)}万` : '0'}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">架构</p>
+            <p className="text-xs text-muted-foreground mt-1">总字数</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold text-amber-400">{completionPercent}%</p>
+            <p className="text-xs text-muted-foreground mt-1">完成度</p>
           </CardContent>
         </Card>
       </div>
+
+      {totalChapters > 0 && (
+        <Card>
+          <CardContent className="p-4 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">创作进度</span>
+              <span className="text-xs">{completedChapters}/{totalChapters} 章已完成</span>
+            </div>
+            <Progress value={completionPercent} className="h-2" />
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">导出</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={handleExportTXT}
+            disabled={exporting || totalChapters === 0}
+            variant="outline"
+            className="gap-2 w-full sm:w-auto"
+          >
+            <Download className="w-4 h-4" />
+            {exporting ? '导出中...' : '导出TXT'}
+          </Button>
+          {totalChapters === 0 && (
+            <p className="text-xs text-muted-foreground mt-2">请先创建章节后再导出</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

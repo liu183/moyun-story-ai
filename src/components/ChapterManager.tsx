@@ -9,10 +9,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import ReactMarkdown from 'react-markdown';
 import {
   Plus, Trash2, Sparkles, Loader2, FileText,
   ChevronDown, ChevronUp, BookOpen, Edit3, Save, X, Play,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function ChapterManager() {
   const {
@@ -77,8 +79,9 @@ export default function ChapterManager() {
         setBatchProgress({ current: i + 1, total: unGenerated.length });
         await generateChapter(unGenerated[i].id);
       }
+      toast.success(`批量生成完成，共 ${unGenerated.length} 章`);
     } catch (error) {
-      console.error('Batch generation error:', error);
+      toast.error(error instanceof Error ? error.message : '批量生成失败');
     } finally {
       setBatchGenerating(false);
       setBatchProgress({ current: 0, total: 0 });
@@ -163,7 +166,12 @@ export default function ChapterManager() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={(e) => { e.stopPropagation(); generateChapter(chapter.id); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              generateChapter(chapter.id)
+                                .then(() => toast.success(`第${chapter.chapterNumber}章 生成完成`))
+                                .catch((err) => toast.error(err.message || '章节生成失败'));
+                            }}
                             disabled={isGenerating}
                             className="gap-1 text-xs text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
                           >
@@ -267,9 +275,9 @@ export default function ChapterManager() {
                     {/* Read-only expanded content */}
                     {isExpanded && !isEditing && !isGeneratingThis && chapter.content && (
                       <div className="mt-3 pt-3 border-t border-border">
-                        <pre className="text-sm text-foreground/90 whitespace-pre-wrap max-h-96 overflow-y-auto font-sans leading-relaxed">
-                          {chapter.content}
-                        </pre>
+                        <div className="prose prose-invert max-w-none prose-headings:text-foreground prose-p:text-foreground/90 prose-strong:text-foreground text-sm max-h-96 overflow-y-auto">
+                          <ReactMarkdown>{chapter.content}</ReactMarkdown>
+                        </div>
                       </div>
                     )}
 

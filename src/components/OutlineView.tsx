@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { Sparkles, Loader2, List, Save, Edit3, Check, FileText } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { toast } from 'sonner';
 
 export default function OutlineView() {
   const {
@@ -140,7 +141,13 @@ export default function OutlineView() {
             </Button>
           )}
           <Button
-            onClick={() => generateOutline()}
+            onClick={() => {
+              generateOutline().then(() => {
+                toast.success('故事大纲生成完成');
+              }).catch((err) => {
+                toast.error(err.message || '大纲生成失败');
+              });
+            }}
             disabled={isGenerating || !hasArchitecture}
             className="gap-1.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
           >

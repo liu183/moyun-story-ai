@@ -30,6 +30,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
+    const { model, temperature, maxTokens } = body;
 
     if (body.action === 'generate') {
       const novel = await db.novel.findUnique({
@@ -72,7 +73,7 @@ ${novel.architecture || novel.description || '暂无架构，请根据书名和�
         },
       ];
 
-      const stream = buildSSEStream(messages);
+      const stream = buildSSEStream(messages, model || undefined, { temperature, maxTokens });
 
       const encoder = new TextEncoder();
       let fullText = '';

@@ -8,7 +8,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Cpu } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Slider } from '@/components/ui/slider';
+import { Cpu, Settings2 } from 'lucide-react';
 import { useEffect } from 'react';
 
 const MODEL_NAMES: Record<string, string> = {
@@ -21,8 +27,19 @@ const MODEL_NAMES: Record<string, string> = {
   'nvidia/llama3-8b-instruct': 'Llama3 8B',
 };
 
+const MAX_TOKEN_OPTIONS = [
+  { value: 2048, label: '2048' },
+  { value: 4096, label: '4096' },
+  { value: 8192, label: '8192' },
+  { value: 12288, label: '12288' },
+  { value: 16384, label: '16384' },
+];
+
 export default function ModelConfig() {
-  const { models, selectedModel, loadModels, setSelectedModel } = useNovelStore();
+  const {
+    models, selectedModel, loadModels, setSelectedModel,
+    temperature, maxTokens, setTemperature, setMaxTokens,
+  } = useNovelStore();
 
   useEffect(() => {
     if (models.length === 0) {
@@ -47,6 +64,65 @@ export default function ModelConfig() {
           ))}
         </SelectContent>
       </Select>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className="p-1.5 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors" title="参数设置">
+            <Settings2 className="w-4 h-4" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 bg-card border-border" side="bottom" align="end">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Settings2 className="w-4 h-4 text-muted-foreground" />
+              <h4 className="text-sm font-medium">AI参数设置</h4>
+            </div>
+
+            {/* Temperature */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-muted-foreground">创意度 (Temperature)</label>
+                <span className="text-xs font-mono text-amber-400">{temperature.toFixed(1)}</span>
+              </div>
+              <Slider
+                value={[temperature]}
+                onValueChange={(v) => setTemperature(v[0])}
+                min={0.1}
+                max={1.5}
+                step={0.1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>严谨 0.1</span>
+                <span>创意 1.5</span>
+              </div>
+            </div>
+
+            {/* Max Tokens */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-muted-foreground">最大生成长度 (Max Tokens)</label>
+                <span className="text-xs font-mono text-amber-400">{maxTokens}</span>
+              </div>
+              <div className="grid grid-cols-5 gap-1">
+                {MAX_TOKEN_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setMaxTokens(opt.value)}
+                    className={`text-[10px] px-1.5 py-1 rounded border transition-colors ${
+                      maxTokens === opt.value
+                        ? 'bg-amber-500/20 border-amber-500/50 text-amber-400'
+                        : 'border-border text-muted-foreground hover:bg-accent'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

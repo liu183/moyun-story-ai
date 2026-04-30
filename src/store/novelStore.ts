@@ -96,6 +96,10 @@ interface NovelStore {
   models: string[];
   selectedModel: string;
 
+  // AI parameters
+  temperature: number;
+  maxTokens: number;
+
   // Actions - Novels
   loadNovels: () => Promise<void>;
   createNovel: (data: { title: string; genre?: string; description?: string; targetWordCount?: number }) => Promise<Novel>;
@@ -144,6 +148,8 @@ interface NovelStore {
   // Actions - Models
   loadModels: () => Promise<void>;
   setSelectedModel: (model: string) => void;
+  setTemperature: (t: number) => void;
+  setMaxTokens: (t: number) => void;
 
   // Actions - Streaming
   setStreamingContent: (content: string) => void;
@@ -219,6 +225,8 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
   streamingContent: '',
   models: [],
   selectedModel: '',
+  temperature: 0.7,
+  maxTokens: 4096,
   relationships: [],
 
   // Novel actions
@@ -293,6 +301,8 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
         {
           action: 'generate',
           model: get().selectedModel || undefined,
+          temperature: get().temperature,
+          maxTokens: get().maxTokens,
         },
         (chunk) => {
           set((s) => ({ streamingContent: s.streamingContent + chunk }));
@@ -383,6 +393,8 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
         {
           action: 'generate',
           model: get().selectedModel || undefined,
+          temperature: get().temperature,
+          maxTokens: get().maxTokens,
         },
         (chunk) => {
           set((s) => ({ streamingContent: s.streamingContent + chunk }));
@@ -505,6 +517,8 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
         {
           chapterCount: chapterCount || get().currentNovel?.targetWordCount || 20,
           model: get().selectedModel || undefined,
+          temperature: get().temperature,
+          maxTokens: get().maxTokens,
         },
         (chunk) => {
           set((s) => ({ streamingContent: s.streamingContent + chunk }));
@@ -592,6 +606,8 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
         `/api/novels/${currentNovel.id}/chapters/${chapterId}/generate`,
         {
           model: get().selectedModel || undefined,
+          temperature: get().temperature,
+          maxTokens: get().maxTokens,
         },
         (chunk) => {
           set((s) => ({ streamingContent: s.streamingContent + chunk }));
@@ -660,6 +676,8 @@ export const useNovelStore = create<NovelStore>((set, get) => ({
   },
 
   setSelectedModel: (model) => set({ selectedModel: model }),
+  setTemperature: (t) => set({ temperature: t }),
+  setMaxTokens: (t) => set({ maxTokens: t }),
 
   // Streaming helpers
   setStreamingContent: (content) => set({ streamingContent: content }),

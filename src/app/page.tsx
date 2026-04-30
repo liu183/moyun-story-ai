@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Component } from 'react';
 import { useNovelStore, type TabType } from '@/store/novelStore';
 import Sidebar from '@/components/Sidebar';
 import ArchitectureView from '@/components/ArchitectureView';
@@ -12,8 +12,10 @@ import NovelSettings from '@/components/NovelSettings';
 import ModelConfig from '@/components/ModelConfig';
 import {
   BookOpen, Users, Globe, List, FileText, Settings,
-  Sparkles, Book,
+  Sparkles, Book, AlertTriangle,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
 
 const tabs: { value: TabType; label: string; icon: React.ReactNode }[] = [
   { value: 'architecture', label: '架构', icon: <BookOpen className="w-4 h-4" /> },
@@ -23,6 +25,30 @@ const tabs: { value: TabType; label: string; icon: React.ReactNode }[] = [
   { value: 'chapters', label: '章节', icon: <FileText className="w-4 h-4" /> },
   { value: 'settings', label: '设置', icon: <Settings className="w-4 h-4" /> },
 ];
+
+class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: Error) {
+    console.error('ErrorBoundary caught:', error);
+    toast.error(`出错了：${error.message || '未知错误'}`);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center max-w-sm">
+            <AlertTriangle className="w-12 h-12 text-destructive mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">组件出现错误</h3>
+            <p className="text-sm text-muted-foreground mb-4">请刷新页面重试</p>
+            <Button onClick={() => this.setState({ hasError: false })}>重试</Button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function Home() {
   const { currentNovel, activeTab, setActiveTab, loadNovels } = useNovelStore();
@@ -84,7 +110,9 @@ export default function Home() {
 
             {/* Tab content */}
             <div className="flex-1 p-6">
-              {renderContent()}
+              <ErrorBoundary>
+                {renderContent()}
+              </ErrorBoundary>
             </div>
           </>
         ) : (
